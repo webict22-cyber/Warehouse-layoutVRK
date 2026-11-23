@@ -4,8 +4,8 @@
 ทุกคนเปิดดูผ่านเบราว์เซอร์ได้ และหน้าจอทุกเครื่องอัปเดตเองทันทีเมื่อมีคนแก้ข้อมูล (SignalR)
 
 ## ติดตั้ง
-1. สร้างฐานข้อมูล `WarehouseLayout` ใน SQL Server แล้วรันตามลำดับ: `db/schema.sql` → `db/seed.sql`
-2. แก้ `src/appsettings.json` : `ConnectionStrings:Db` และ `EditKey` (รหัสสำหรับคนที่มีสิทธิ์แก้ไข)
+1. ใน MySQL 8 รันตามลำดับ: `db/schema.sql` (สร้างฐานข้อมูล WarehouseLayout ให้เอง) → `db/seed.sql`
+2. แก้ `src/appsettings.json` : `ConnectionStrings:Db` (user/password ของ MySQL) และ `EditKey` (รหัสสำหรับคนที่มีสิทธิ์แก้ไข)
 3. `cd src && dotnet run` แล้วเปิด http://localhost:5000 (ดูพอร์ตจริงในหน้าจอ console)
 
 ## หมายเหตุ
