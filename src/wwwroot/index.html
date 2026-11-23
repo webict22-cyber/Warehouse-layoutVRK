@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ผังคลังเม็ดพลาสติก</title>
+<style>
+:root{--bg:#f6f5f1;--sf:#fff;--tx:#1f1f1c;--mut:#6b6a63;--bd:#d9d7cf}
+@media(prefers-color-scheme:dark){:root{--bg:#1a1a18;--sf:#242421;--tx:#ecebe5;--mut:#a09f96;--bd:#3d3c37}}
+*{box-sizing:border-box}body{margin:0;padding:14px;background:var(--bg);color:var(--tx);font-family:system-ui,"Noto Sans Thai",sans-serif}
+h1{font-size:19px;margin:0}.sub{font-size:12px;color:var(--mut);margin:2px 0 10px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+select,input,button{font:inherit;padding:7px 9px;border:1px solid var(--bd);border-radius:8px;background:var(--sf);color:var(--tx)}
+.lg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-bottom:8px}.lg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;border:1px solid var(--bd)}
+.zone{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:10px;margin-bottom:12px}.zone h2{font-size:13px;color:var(--mut);margin:0 0 8px}
+.sc{overflow-x:auto}.racks{display:flex;gap:8px;min-width:max-content}
+.rl{background:#c0472f;color:#fff;font-size:12px;font-weight:600;text-align:center;border-radius:6px 6px 0 0;padding:3px 4px}
+.cells{display:flex}
+.cell{width:38px;min-height:150px;border:1px solid var(--bd);border-left-width:3px;padding:3px 2px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;font-size:11px;cursor:pointer;background:#ebeae5;border-left-color:#a9a79e;color:#1f1f1c}
+.cells.w1 .cell{width:46px}.cells.one .cell{width:64px;min-height:96px}
+.cell .t{writing-mode:vertical-rl;font-weight:600;max-height:104px;overflow:hidden}.cells.one .t{writing-mode:horizontal-tb;text-align:center;max-height:none}
+.cell.unk{background:#fbf0c8;border-left-color:#d4b13a}.cell.ok{background:#cfe8d3;border-left-color:#5aa56a}.cell.low{background:#fde0b8;border-left-color:#e19a2b}.cell.full{background:#cddff5;border-left-color:#3f7fc4}
+.cell.dim{opacity:.25}.cell.hit{outline:2px solid #d4380d;outline-offset:-2px}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--sf);color:var(--tx);width:min(340px,92vw)}
+label{display:block;font-size:12px;color:var(--mut);margin:9px 0 3px}dialog input{width:100%}
+.row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}.pri{background:#3f7fc4;color:#fff}
+</style></head><body>
+<h1>ผังคลังเม็ดพลาสติก</h1>
+<div class="sub"><span id="st">กำลังโหลด…</span></div>
+<div class="bar"><select id="wh"><option value="WH1">คลัง ประตู1 (RM01–RM19)</option><option value="WH3">โรง 3</option></select>
+<input id="q" placeholder="ค้นหาเม็ด / ล็อต" style="flex:1;min-width:140px"><button id="key">ใส่รหัสแก้ไข</button></div>
+<div class="lg"><span><i style="background:#cddff5"></i>เต็ม ≥80%</span><span><i style="background:#cfe8d3"></i>ปกติ</span><span><i style="background:#fde0b8"></i>เหลือน้อย &lt;25%</span><span><i style="background:#fbf0c8"></i>ยังไม่กรอกปริมาณ</span><span><i style="background:#ebeae5"></i>ว่าง</span></div>
+<div id="zones"></div>
+<dialog id="dlg"><b id="dt"></b>
+<label>ชนิด/เกรดเม็ด (เว้นว่าง = ช่องว่าง)</label><input id="dr">
+<label>ล็อต</label><input id="dl">
+<label>ปริมาณ (กระสอบ) · ความจุ <span id="cap"></span></label><input id="dq" type="number" min="0" step="0.5">
+<label>ผู้บันทึก</label><input id="du">
+<div class="row"><button id="dx">ปิด</button><button class="pri" id="ds">บันทึก</button></div></dialog>
+<script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+<script>
+var D=[],cur=null,$=function(i){return document.getElementById(i)};
+var ZN={TOP:"แถวบน",BOTTOM:"แถวล่าง",RIGHT:"ฝั่งขวา",FLOOR:"ลานพื้น"};
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}return null}
+function stat(s){if(!s.resin)return"";if(s.qtyBags==null)return"unk";var p=s.qtyBags/s.capacityBags;return p>=.8?"full":p<.25?"low":"ok"}
+async function load(){var r=await fetch("/api/slots");D=await r.json();render();$("st").textContent="อัปเดตล่าสุด "+new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function render(){
+ var wh=$("wh").value,q=$("q").value.trim().toLowerCase(),h="",zs=[];
+ D.filter(function(s){return s.warehouse===wh}).forEach(function(s){if(zs.indexOf(s.zone)<0)zs.push(s.zone)});
+ zs.forEach(function(z){
+  var rk=[];D.filter(function(s){return s.warehouse===wh&&s.zone===z}).forEach(function(s){var l=rk[rk.length-1];if(l&&l.n===s.rack)l.s.push(s);else rk.push({n:s.rack,s:[s]})});
+  h+='<div class="zone"><h2>'+ZN[z]+'</h2><div class="sc"><div class="racks">';
+  rk.forEach(function(r){var one=r.s.length===1;
+   h+='<div><div class="rl">'+(one?esc(r.s[0].code.split("-")[1]):r.n)+'</div><div class="cells '+(one?"one":"w1")+'">';
+   r.s.forEach(function(s){var c="cell "+stat(s),m=!q||((s.resin||"")+" "+(s.lotNo||"")).toLowerCase().indexOf(q)>=0;
+    if(q)c+=m&&s.resin?" hit":" dim";
+    h+='<div class="'+c+'" data-id="'+s.slotId+'"><span class="t">'+(s.resin?esc(s.resin):"ว่าง")+'</span><span>'+(s.resin?(s.qtyBags==null?"?":s.qtyBags):"")+'</span></div>'});
+   h+='</div></div>'});
+  h+='</div></div></div>'});
+ $("zones").innerHTML=h}
+$("zones").onclick=function(e){var el=e.target.closest(".cell");if(!el)return;
+ cur=D.find(function(s){return s.slotId==el.dataset.id});
+ $("dt").textContent="ช่อง "+cur.code;$("dr").value=cur.resin||"";$("dl").value=cur.lotNo||"";$("dq").value=cur.qtyBags==null?"":cur.qtyBags;
+ $("du").value=ls("by")||"";$("cap").textContent=cur.capacityBags;$("dlg").showModal()};
+$("ds").onclick=async function(){
+ var k=ls("key");if(!k){alert("ใส่รหัสแก้ไขก่อน (ปุ่มด้านบน)");return}
+ var by=$("du").value.trim();ls("by",by);var qv=$("dq").value,rs=$("dr").value.trim();
+ var r=await fetch("/api/slots/"+cur.slotId+"/stock",{method:"PUT",headers:{"Content-Type":"application/json","X-Edit-Key":k},
+  body:JSON.stringify({resin:rs||null,lotNo:$("dl").value.trim()||null,qtyBags:rs&&qv!==""?Number(qv):null,updatedBy:by||null})});
+ if(r.status===401){alert("รหัสแก้ไขไม่ถูกต้อง");return}
+ $("dlg").close()};
+$("dx").onclick=function(){$("dlg").close()};
+$("key").onclick=function(){var k=prompt("รหัสแก้ไข");if(k)ls("key",k)};
+$("wh").onchange=render;$("q").oninput=render;
+load();
+var hub=new signalR.HubConnectionBuilder().withUrl("/hub").withAutomaticReconnect().build();
+hub.on("changed",load);hub.onreconnected(load);hub.start().catch(function(){});
+</script></body></html>
